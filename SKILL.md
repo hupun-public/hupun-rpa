@@ -141,15 +141,68 @@ thinking_mode: none
 
 ### 12. daily_briefing - 今日简要
 
-生成当日 RPA 任务执行情况摘要。
+生成当日 RPA 任务执行情况摘要。返回 JSON 格式数据，本 Skill 负责格式化为 Markdown 展示。
 
 **参数**：无
 
-**返回**：Markdown 格式的当日任务摘要，包含：
-- 执行统计（成功/失败/运行中数量）
-- 按机器人类型分组的执行详情
-- 失败原因归类及主因占比
-- 环比昨日（当机器人类型数 >=10 且昨日任务数 >=10 时显示）
+**返回 JSON 格式**：
+```json
+{
+  "date": "2026-04-24",
+  "stats": {
+    "succeed": 8,
+    "failed": 2,
+    "running": 1
+  },
+  "details": {
+    "succeed": [{ "name": "阿里妈妈账单", "count": 3 }],
+    "failed": [{ "name": "拼多多账单", "count": 1, "reason": "Cookie失效" }],
+    "running": [{ "name": "淘宝订单同步", "startTime": "15:30" }]
+  },
+  "comparison": {
+    "totalChange": 2,
+    "successRateChange": 5
+  },
+  "mainFailureReason": { "reason": "Cookie失效", "percent": 50 }
+}
+```
+
+**字段说明**：
+- `stats` - 执行统计（成功/失败/运行中数量）
+- `details` - 按机器人类型分组的执行详情
+- `comparison` - 环比昨日（仅当机器人类型数 >=10 且昨日任务数 >=10 时存在）
+- `mainFailureReason` - 主要失败类型及占比（仅当有失败任务时存在）
+
+## JSON 转 Markdown 格式规则
+
+当用户问"今日简要"时，调用 `daily_briefing` 获取 JSON 数据，格式化为 Markdown：
+
+```markdown
+# 📊 今日 RPA 简要 (${date})
+
+## 📈 执行统计
+| 状态 | 数量 |
+|------|------|
+| ✅ 成功 | ${stats.succeed} |
+| ❌ 失败 | ${stats.failed} |
+| 🔄 运行中 | ${stats.running} |
+
+## 🤖 执行详情
+
+### ✅ 成功
+${details.succeed.map(x => `- ${x.name} x${x.count}`).join('\n')}
+
+### ❌ 失败
+${details.failed.map(x => `- ${x.name} x${x.count} → ${x.reason}`).join('\n')}
+
+## 📉 环比昨日
+| 对比 | 变化 |
+|------|------|
+| 总任务 | ${totalChange >= 0 ? '+' : ''}${totalChange} (${todayTotal}→${yesterdayTotal}) |
+| 成功率 | ${successRateChange >= 0 ? '+' : ''}${successRateChange}% |
+
+> ⚠️ 主要失败类型：${mainFailureReason.reason} (${mainFailureReason.percent}%)
+```
 
 **失败归类规则**：
 | 归类 | 关键词 |
